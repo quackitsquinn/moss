@@ -1,3 +1,4 @@
 /target
 test_images/
-apollo-blueprints/
+/apollo-blueprints/
+/db
