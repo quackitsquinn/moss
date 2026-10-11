@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gobwas/glob"
 	"github.com/quackitsquinn/moss/internal/db"
+	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	var rootSrc = flag.String("root_src", "", "Root source directory, supports globbing")
-	var rootDst = flag.String("root_dst", "", "Root destination directory")
+	var rootSrc = flag.String("src", "", "Root source directory, supports globbing")
+	var rootDst = flag.String("dst", "", "Root destination directory")
 	var shouldReplaceOld = flag.Bool("replace", false, "Replace existing database")
-	var ext = flag.String("ext", ".png", "File extension to include in the database")
+	var srcGlob = flag.String("glob", "*", "Only links files that match the given glob")
 	flag.Parse()
 
 	if *rootSrc == "" || *rootDst == "" {
@@ -30,11 +32,23 @@ func main() {
 		return
 	}
 
+	glob, err := glob.Compile(*srcGlob)
+	if err != nil {
+		fmt.Printf("Failed to compile given glob: %v\n", err)
+	}
+
 	fmt.Printf("Generating database at %s from source %s\n", *rootDst, *rootSrc)
 	// Generate database
-	if err := db.GenerateDB(*rootSrc, *rootDst, *ext); err != nil {
+	if err := db.GenerateDB(*rootSrc, *rootDst, *glob); err != nil {
 		fmt.Printf("Error generating database: %v\n", err)
 		os.Exit(1)
 	}
+}
 
+func Commands() []cli.Command {
+	return nil
+}
+
+type MossContext struct {
+	DataDir string
 }

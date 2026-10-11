@@ -13,10 +13,9 @@ type DB struct {
 	highest_folder []uint8
 	file_idx       uint8
 	base           string
-	ext            string
 }
 
-func LoadDB(dbBase string, ext string) (*DB, error) {
+func LoadDB(dbBase string) (*DB, error) {
 	largest_folder, file_idx, err := readDB(dbBase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load database: %w", err)
@@ -26,13 +25,15 @@ func LoadDB(dbBase string, ext string) (*DB, error) {
 		highest_folder: largest_folder,
 		file_idx:       file_idx,
 		base:           dbBase,
-		ext:            ext,
 	}, nil
 }
 
 func (db *DB) Base() string {
 	return db.base
 }
+
+// FilePrefix is the prefix that is appended to file names when constructing the full path to a file.
+const FilePrefix = "."
 
 func (db *DB) FilePath(indices []uint8) (*string, error) {
 	if len(indices) < 1 {
@@ -43,7 +44,8 @@ func (db *DB) FilePath(indices []uint8) (*string, error) {
 		return nil, errors.New("indices exceed the depth of the database")
 	}
 
-	path := formatPath(db.base, indices) + db.ext
+	file_idx := indices[len(indices)-1]
+	path := formatPath(db.base, indices[:len(indices)-1], &file_idx)
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("file does not exist at path: %s", path)

@@ -8,10 +8,12 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+
+	"github.com/gobwas/glob"
 )
 
 // GenerateDB generates a database at the specified rootDst path based on the files found in the rootSrc path.
-func GenerateDB(rootSrc, relDst, ext string) error {
+func GenerateDB(rootSrc, relDst string, filter glob.Pattern) error {
 	var builder = newDBBuilder()
 	rootSrc, err := filepath.Abs(rootSrc)
 	if err != nil {
@@ -41,7 +43,7 @@ func GenerateDB(rootSrc, relDst, ext string) error {
 			return nil
 		}
 
-		if filepath.Ext(path) != ext {
+		if !filter.Match(path) {
 			return nil
 		}
 
@@ -92,13 +94,16 @@ func newDBBuilder() *dbBuilder {
 }
 
 // formatPath formats the current path in the database structure as a string, using the specified dbBase as the root.
-func formatPath(dbBase string, intpath []uint8) string {
+func formatPath(dbBase string, intpath []uint8, file_idx *uint8) string {
 	var formatted = dbBase
 
 	for _, level := range intpath {
 		formatted = path.Join(formatted, fmt.Sprintf("%x", level))
 	}
 
+	if file_idx != nil {
+		return path.Join(formatted, fmt.Sprintf(".%x", *file_idx))
+	}
 	return formatted
 }
 
@@ -108,7 +113,7 @@ func (b *dbBuilder) bumpFolder(dbBase string) (*string, error) {
 		idx := b.current_path[path_idx_back]
 		if idx < maxSubfoldersPerDir {
 			b.current_path[path_idx_back]++
-			var newPath = formatPath(dbBase, b.current_path)
+			var newPath = formatPath(dbBase, b.current_path, nil)
 			return &newPath, nil
 		}
 
@@ -117,7 +122,7 @@ func (b *dbBuilder) bumpFolder(dbBase string) (*string, error) {
 
 	b.current_path = slices.Repeat([]uint8{0}, len(b.current_path)+1)
 
-	var newPath = formatPath(dbBase, b.current_path)
+	var newPath = formatPath(dbBase, b.current_path, nil)
 	return &newPath, nil
 }
 
@@ -150,7 +155,7 @@ func (b *dbBuilder) bump(dbBase string) error {
 
 // currentFile returns the path to the current file in the database structure.
 func (b *dbBuilder) currentFile(dbBase string) string {
-	return path.Join(formatPath(dbBase, b.current_path), fmt.Sprintf("%x", b.file_idx))
+	return formatPath(dbBase, b.current_path, &b.file_idx)
 }
 
 // parentFolder returns the path to the parent folder of the current path in the database structure, returning the base path if the current path is empty.
@@ -158,13 +163,13 @@ func (b *dbBuilder) parentFolder(dbBase string) string {
 	if len(b.current_path) < 1 {
 		return dbBase
 	}
-	return formatPath(dbBase, b.current_path[:len(b.current_path)-1])
+	return formatPath(dbBase, b.current_path[:len(b.current_path)-1], nil)
 }
 
 // submitFile creates a symlink for the specified file in the database structure and increments the current path to the next available path.
 func (b *dbBuilder) submitFile(filePath, dbBase string) error {
 	fmt.Printf("Submitting file: %s\n", filePath)
-	if err := os.Symlink(filePath, b.currentFile(dbBase)+path.Ext(filePath)); err != nil {
+	if err := os.Symlink(filePath, b.currentFile(dbBase)); err != nil {
 		return fmt.Errorf("failed to create symlink for file %s: %w", filePath, err)
 	}
 	if err := b.bump(dbBase); err != nil {
