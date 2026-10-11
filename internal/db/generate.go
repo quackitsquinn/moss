@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,8 +11,16 @@ import (
 )
 
 // GenerateDB generates a database at the specified rootDst path based on the files found in the rootSrc path.
-func GenerateDB(rootSrc, rootDst string) error {
+func GenerateDB(rootSrc, relDst, ext string) error {
 	var builder = newDBBuilder()
+	rootSrc, err := filepath.Abs(rootSrc)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for source directory %s: %w", rootSrc, err)
+	}
+	rootDst, err := filepath.Abs(relDst)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for destination directory %s: %w", relDst, err)
+	}
 
 	fmt.Printf("Generating database at %s from source %s\n", rootDst, rootSrc)
 
@@ -19,7 +28,7 @@ func GenerateDB(rootSrc, rootDst string) error {
 		return fmt.Errorf("failed to create destination directory %s: %w", rootDst, err)
 	}
 
-	err := filepath.WalkDir(rootSrc, func(
+	err = filepath.WalkDir(rootSrc, func(
 		path string,
 		d fs.DirEntry,
 		err error,
@@ -29,6 +38,10 @@ func GenerateDB(rootSrc, rootDst string) error {
 		}
 
 		if d.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(path) != ext {
 			return nil
 		}
 
@@ -42,6 +55,11 @@ func GenerateDB(rootSrc, rootDst string) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to walk source directory: %w", err)
+	}
+
+	err = builder.build(rootDst)
+	if err != nil {
+		return fmt.Errorf("failed to build database: %w", err)
 	}
 
 	return nil
@@ -59,11 +77,13 @@ const bitsPerLevel = 4
 const maxFilesPerDir = (1 << bitsPerLevel) - 1      // 16
 const maxSubfoldersPerDir = (1 << bitsPerLevel) - 1 // 16
 
+// dbBuilder is a struct that helps manage the current path and file index while generating a database structure.
 type dbBuilder struct {
 	current_path []uint8
 	file_idx     uint8
 }
 
+// newDBBuilder creates a new dbBuilder instance with the initial path set to [0] and the file index set to 0.
 func newDBBuilder() *dbBuilder {
 	return &dbBuilder{
 		current_path: []uint8{0},
@@ -71,6 +91,7 @@ func newDBBuilder() *dbBuilder {
 	}
 }
 
+// formatPath formats the current path in the database structure as a string, using the specified dbBase as the root.
 func formatPath(dbBase string, intpath []uint8) string {
 	var formatted = dbBase
 
@@ -121,7 +142,9 @@ func (b *dbBuilder) bump(dbBase string) error {
 		return nil
 	}
 	b.file_idx = 0
-	b.nextFolder(dbBase)
+	if err := b.nextFolder(dbBase); err != nil {
+		return fmt.Errorf("failed to create next folder: %w", err)
+	}
 	return nil
 }
 
@@ -149,4 +172,48 @@ func (b *dbBuilder) submitFile(filePath, dbBase string) error {
 	}
 
 	return nil
+}
+
+func (b *dbBuilder) build(dbBase string) error {
+	writer, err := os.Create(path.Join(dbBase, ".db"))
+	if err != nil {
+		return fmt.Errorf("failed to create .db file: %w", err)
+	}
+	defer writer.Close()
+
+	writeByte := func(b byte) error {
+		if _, err := writer.Write([]byte{b}); err != nil {
+			return fmt.Errorf("failed to write to .db file: %w", err)
+		}
+		return nil
+	}
+
+	for _, level := range b.current_path {
+		if err := writeByte(level); err != nil {
+			return err
+		}
+	}
+
+	if err := writeByte(b.file_idx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readDB(dbBase string) ([]uint8, uint8, error) {
+	dbFilePath := path.Join(dbBase, ".db")
+	data, err := os.ReadFile(dbFilePath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read .db file: %w", err)
+	}
+
+	if len(data) < 1 {
+		return nil, 0, errors.New(".db file is empty or corrupted")
+	}
+
+	currentPath := data[:len(data)-1]
+	fileIdx := data[len(data)-1]
+
+	return currentPath, fileIdx, nil
 }
