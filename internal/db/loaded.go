@@ -15,6 +15,7 @@ type DB struct {
 	base           string
 }
 
+// LoadDB loads the database from the specified base path and returns a pointer to the DB struct.
 func LoadDB(dbBase string) (*DB, error) {
 	largest_folder, file_idx, err := readDB(dbBase)
 	if err != nil {
@@ -28,6 +29,7 @@ func LoadDB(dbBase string) (*DB, error) {
 	}, nil
 }
 
+// Base returns the base path of the database.
 func (db *DB) Base() string {
 	return db.base
 }
@@ -35,6 +37,7 @@ func (db *DB) Base() string {
 // FilePrefix is the prefix that is appended to file names when constructing the full path to a file.
 const FilePrefix = "."
 
+// FilePath constructs the full path to a file based on the provided indices. It returns an error if the indices are invalid or if the file does not exist.
 func (db *DB) FilePath(indices []uint8) (*string, error) {
 	if len(indices) < 1 {
 		return nil, errors.New("indices cannot be empty")
@@ -60,6 +63,10 @@ func (db *DB) genNumberOfIndices() int {
 	return int(exp * float64(len(db.highest_folder)-1))
 }
 
+// SelectFile randomly selects a file from the database and returns its path.
+// It generates a random path based on the structure of the database and checks if the file exists.
+//
+//	If the database is empty or if there is an error selecting a file, it returns an error.
 func (db *DB) SelectFile() (*string, error) {
 	if len(db.highest_folder) == 0 {
 		return nil, errors.New("database is empty")
