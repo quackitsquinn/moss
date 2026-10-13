@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gobwas/glob"
+	"github.com/pelletier/go-toml"
 	"github.com/quackitsquinn/moss/internal/db"
 	"github.com/quackitsquinn/moss/internal/server"
 	"github.com/urfave/cli/v3"
@@ -16,18 +17,18 @@ func main() {
 		Name:     os.Args[0],
 		Commands: Commands(),
 		Usage:    "Moss is a tool for managing and querying large datasets.",
-
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "db",
-				Usage:    "Root directory to the database. Optionally specified with the MOSS_DATA_DIRECTORY environment variable.",
-				Required: true,
-			},
-		},
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	}
+}
+
+func DbFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:     "db",
+		Usage:    "Root directory to the database. Optionally specified with the MOSS_DATA_DIRECTORY environment variable.",
+		Required: true,
 	}
 }
 
@@ -62,6 +63,7 @@ func GenerateDBCommand() cli.Command {
 				Usage: "Only links files that match the given glob",
 				Value: "*",
 			},
+			DbFlag(),
 		},
 		Action: GenerateDBAction,
 	}
@@ -73,6 +75,9 @@ func RemoveDBCommand() cli.Command {
 		Usage:   "Remove a database",
 		Aliases: []string{"rm-db"},
 		Action:  RemoveDBAction,
+		Flags: []cli.Flag{
+			DbFlag(),
+		},
 	}
 }
 
@@ -93,33 +98,76 @@ func RemoveDBAction(ctx context.Context, c *cli.Command) error {
 
 func RunServerCommand() cli.Command {
 	return cli.Command{
-		Name:    "run-server",
-		Usage:   "Run the moss server",
-		Aliases: []string{"server"},
+		Name:  "server",
+		Usage: "Run the moss server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "host_addr",
-				Usage: "Port to listen on",
-				Value: ":8080",
+				Name:     "config_file",
+				Aliases:  []string{"c", "cfg", "config"},
+				Usage:    "Path to the configuration file",
+				Required: true,
+			},
+		},
+		Commands: []*cli.Command{
+			{
+				Name:   "run",
+				Usage:  "Run the moss server",
+				Action: RunServerAction,
+			},
+			{
+				Name:   "defconfig",
+				Usage:  "Generate a default configuration file",
+				Action: DefConfigAction,
 			},
 		},
 		Action: RunServerAction,
 	}
 }
 
+func DefConfigAction(ctx context.Context, c *cli.Command) error {
+	config := server.DefaultConfig()
+	configFile := c.String("config_file")
+
+	file, err := os.Create(configFile)
+	if err != nil {
+		return fmt.Errorf("failed to create config file: %w", err)
+	}
+	defer file.Close()
+
+	enc := toml.NewEncoder(file)
+	if err := enc.Encode(config); err != nil {
+		return fmt.Errorf("failed to encode config to file: %w", err)
+	}
+
+	fmt.Printf("Default configuration written to %s\n", configFile)
+	return nil
+}
+
+func LoadConfig(path string) (*server.Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open config file: %w", err)
+	}
+	defer file.Close()
+
+	dec := toml.NewDecoder(file)
+
+	cfg := server.Config{}
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config file: %w", err)
+	}
+
+	return &cfg, nil
+}
+
 func RunServerAction(ctx context.Context, c *cli.Command) error {
-	hostAddr := c.String("host_addr")
-	db, err := LoadCurrentDB(c)
+	cfg := c.String("config_file")
+	config, err := LoadConfig(cfg)
 	if err != nil {
 		return err
 	}
 
-	cfg := server.Config{
-		HostAddr: hostAddr,
-		DB:       *db,
-	}
-
-	if err := server.RunServer(cfg); err != nil {
+	if err := server.RunServer(*config); err != nil {
 		return fmt.Errorf("failed to run server: %w", err)
 	}
 

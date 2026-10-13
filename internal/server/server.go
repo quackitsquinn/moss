@@ -14,19 +14,44 @@ import (
 
 // Config holds the configuration for the server.
 type Config struct {
-	HostAddr      string
-	DB            db.DB
-	MaxBatchSize  uint32
+	Server ServerConfig
+	DB     DBConfig
+}
+type ServerConfig struct {
+	HostAddr     string
+	MaxBatchSize uint32
+}
+
+type DBConfig struct {
+	Path          string
 	ContentType   string
 	FileExtension string
 }
 
+func DefaultConfig() Config {
+	return Config{
+		Server: ServerConfig{
+			HostAddr:     "localhost:8080",
+			MaxBatchSize: 64,
+		},
+		DB: DBConfig{
+			Path:          "./db",
+			ContentType:   "image/png",
+			FileExtension: ".png",
+		},
+	}
+}
+
 // RunServer starts the HTTP server with the given configurations.
 func RunServer(config Config) error {
+	db, err := db.LoadDB(config.DB.Path)
+	if err != nil {
+		return fmt.Errorf("failed to load database: %w", err)
+	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		doRandomFile(w, r, &config)
+		doRandomFile(w, r, &config, db)
 	})
-	err := http.ListenAndServe(config.HostAddr, nil)
+	err = http.ListenAndServe(config.Server.HostAddr, nil)
 	if err != nil {
 		slog.Error("Failed to start server", "error", err)
 		return err
@@ -35,7 +60,7 @@ func RunServer(config Config) error {
 	return nil
 }
 
-func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config) {
+func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config, db *db.DB) {
 	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")
 
 	n_str := r.URL.Query().Get("n")
@@ -53,14 +78,14 @@ func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config) {
 	}
 
 	if n == 1 {
-		w.Header().Set("Content-Type", config.ContentType)
+		w.Header().Set("Content-Type", config.DB.ContentType)
 	} else {
 		w.Header().Set("Content-Type", "application/zip")
 	}
 
-	if config.MaxBatchSize > 0 && n > config.MaxBatchSize {
-		slog.Error("Requested batch size exceeds maximum", "requested", n, "max", config.MaxBatchSize)
-		http.Error(w, "Requested batch size exceeds maximum: "+strconv.Itoa(int(config.MaxBatchSize)), http.StatusBadRequest)
+	if config.Server.MaxBatchSize > 0 && n > config.Server.MaxBatchSize {
+		slog.Error("Requested batch size exceeds maximum", "requested", n, "max", config.Server.MaxBatchSize)
+		http.Error(w, "Requested batch size exceeds maximum: "+strconv.Itoa(int(config.Server.MaxBatchSize)), http.StatusBadRequest)
 		return
 	}
 
@@ -77,7 +102,7 @@ func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config) {
 	}
 	var lastFile *string
 	for i := range n {
-		selectedFile, err := config.DB.SelectFile()
+		selectedFile, err := db.SelectFile()
 		if err != nil {
 
 			slog.Error("Failed to select file", "error", err)
@@ -94,7 +119,7 @@ func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config) {
 			}
 			defer file.Close()
 
-			zipfile, err := z.Create(fmt.Sprint(i, config.FileExtension))
+			zipfile, err := z.Create(fmt.Sprint(i, config.DB.FileExtension))
 			if err != nil {
 				z.Close()
 				slog.Error("Failed to create zip entry", "error", err)

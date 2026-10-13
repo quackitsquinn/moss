@@ -3,3 +3,4 @@ test_images/
 /apollo-blueprints/
 /db
 /build
+/cfg.toml
