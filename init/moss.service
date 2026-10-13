@@ -1,9 +1,14 @@
+# An example systemd service file for moss. 
+# This file should be placed in /etc/systemd/system/moss.service and can be enabled with `systemctl enable moss` 
+# and started with `systemctl start moss`.
+# This enables a whole bunch of security features, as the server right now has no functionality that will write to the filesystem.
+# We can do cool stuff like make the while filesystem read-only, and prevent the server from accessing kernel tunables, modules, logs, etc.
 [Unit]
 Description=Moss Service
 
 [Service]
 Type=exec
-ExecStart=/var/lib/moss/moss_srv -db /var/lib/moss/db
+ExecStart=/usr/bin/env mossctl run-server --config_file /etc/moss/config.toml
 User=moss
 Group=moss
 Restart=on-failure
