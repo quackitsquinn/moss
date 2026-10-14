@@ -14,20 +14,31 @@ import (
 
 // Config holds the configuration for the server.
 type Config struct {
+	// Server holds the server configuration.
 	Server ServerConfig
-	DB     DBConfig
+	// DB holds the database configuration.
+	DB DBConfig
 }
+
+// ServerConfig holds the configuration for the HTTP server.
 type ServerConfig struct {
-	HostAddr     string
+	// HostAddr is the address the server will listen on, e.g., "localhost:8080".
+	HostAddr string
+	// MaxBatchSize is the maximum number of files that can be requested in a single batch.
 	MaxBatchSize uint32
 }
 
+// DBConfig holds the configuration for the database.
 type DBConfig struct {
-	Path          string
-	ContentType   string
+	// Path is the path to the database directory.
+	Path string
+	// ContentType is the MIME type of the files in the database, e.g., "image/png".
+	ContentType string
+	// FileExtension is the file extension of the files in the database, e.g., ".png".
 	FileExtension string
 }
 
+// DefaultConfig returns a Config struct populated with default values.
 func DefaultConfig() Config {
 	return Config{
 		Server: ServerConfig{
@@ -60,6 +71,7 @@ func RunServer(config Config) error {
 	return nil
 }
 
+// doRandomFile handles HTTP requests to serve random files from the database.
 func doRandomFile(w http.ResponseWriter, r *http.Request, config *Config, db *db.DB) {
 	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")
 

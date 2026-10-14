@@ -1,0 +1,17 @@
+# Database configuration. You can create a database with
+# mossctl generate-db --src <source_dir> --db <db_dir>`.
+[DB]
+  # The content type that the API will serve. This is used to set the Content-Type header in HTTP responses.
+  ContentType = "image/png"
+  # The file extension that the API will use for the generated images. Right now this is really only used for zip files.
+  # Does nothing if MaxBatchSize == 1
+  FileExtension = ".png"
+  # The path to the database directory.
+  Path = "./db"
+
+# Server configuration. This is used to configure the HTTP server that serves the images.
+[Server]
+  # The address that the server will listen on.
+  HostAddr = "localhost:8080"
+  # The maximum number of images that can be requested in a single batch. If this is set to 1, the server will only allow single image requests.
+  MaxBatchSize = 64

@@ -12,6 +12,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// main is the entry point for the mossctl command-line tool.
 func main() {
 	cmd := &cli.Command{
 		Name:     os.Args[0],
@@ -24,6 +25,7 @@ func main() {
 	}
 }
 
+// DbFlag returns a cli.Flag for specifying the database path.
 func DbFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:     "db",
@@ -32,6 +34,7 @@ func DbFlag() cli.Flag {
 	}
 }
 
+// Commands returns the list of CLI commands for the application.
 func Commands() []*cli.Command {
 	generate := GenerateDBCommand()
 	remove := RemoveDBCommand()
@@ -43,6 +46,7 @@ func Commands() []*cli.Command {
 	}
 }
 
+// GenerateDBCommand returns a cli.Command for generating a database from a source directory.
 func GenerateDBCommand() cli.Command {
 	return cli.Command{
 		Name:    "generate-db",
@@ -69,6 +73,7 @@ func GenerateDBCommand() cli.Command {
 	}
 }
 
+// RemoveDBCommand returns a cli.Command for removing an existing database.
 func RemoveDBCommand() cli.Command {
 	return cli.Command{
 		Name:    "remove-db",
@@ -81,6 +86,7 @@ func RemoveDBCommand() cli.Command {
 	}
 }
 
+// RemoveDBAction removes the database at the specified path.
 func RemoveDBAction(ctx context.Context, c *cli.Command) error {
 	rootDstPtr, err := ReadCurrentDBPath(c)
 	if err != nil {
@@ -96,6 +102,7 @@ func RemoveDBAction(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
+// RunServerCommand returns a cli.Command for running the moss server.
 func RunServerCommand() cli.Command {
 	return cli.Command{
 		Name:  "server",
@@ -124,6 +131,7 @@ func RunServerCommand() cli.Command {
 	}
 }
 
+// DefConfigAction generates a default configuration file at the specified path.
 func DefConfigAction(ctx context.Context, c *cli.Command) error {
 	config := server.DefaultConfig()
 	configFile := c.String("config_file")
@@ -143,6 +151,7 @@ func DefConfigAction(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
+// LoadConfig loads the server configuration from the specified TOML file.
 func LoadConfig(path string) (*server.Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -160,6 +169,7 @@ func LoadConfig(path string) (*server.Config, error) {
 	return &cfg, nil
 }
 
+// RunServerAction runs the moss server with the specified configuration.
 func RunServerAction(ctx context.Context, c *cli.Command) error {
 	cfg := c.String("config_file")
 	config, err := LoadConfig(cfg)
@@ -174,8 +184,10 @@ func RunServerAction(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
+// DBEnvVar is the environment variable used to specify the database path.
 const DBEnvVar = "MOSS_DATA_DIR"
 
+// ReadCurrentDBPath reads the database path from the command line flag or environment variable.
 func ReadCurrentDBPath(c *cli.Command) (*string, error) {
 	dbPath := c.String("db")
 	if c.String("db") != "" {
@@ -188,6 +200,7 @@ func ReadCurrentDBPath(c *cli.Command) (*string, error) {
 	return nil, fmt.Errorf("no database path provided. Please specify a path with the --db flag or set the MOSS_DATA_DIR environment variable")
 }
 
+// LoadCurrentDB loads the database from the path specified in the command line flag or environment variable.
 func LoadCurrentDB(c *cli.Command) (*db.DB, error) {
 	rootDstPtr, err := ReadCurrentDBPath(c)
 	if err != nil {
@@ -202,6 +215,7 @@ func LoadCurrentDB(c *cli.Command) (*db.DB, error) {
 	return db, nil
 }
 
+// GenerateDBAction generates a database from the specified source directory and writes it to the specified destination directory.
 func GenerateDBAction(ctx context.Context, c *cli.Command) error {
 	rootSrc := c.String("src")
 	rootDstPtr, err := ReadCurrentDBPath(c)

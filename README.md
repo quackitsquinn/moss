@@ -27,3 +27,5 @@ At first I just grabbed around 5~ collections from the [Internet Archive](https:
    - That's this project!
 2. A fancier background app that's designed around composability and animation and filters, half to fix the problem of "how do I get my desktop to use this URL as a background source", and half because I kinda miss Wallpaper Engine from before I switched to Linux.
    - I haven't quite started this yet. Right now I know it's gonna be configured using a declarative toml file (though, I'm not entirely opposed to lua or python) that ideally has a super nice no-code GUI for it. Only wrinkle is getting the window to behave like a desktop background.. I'm sure I'll figure it out.
+
+Since this project is now at a mostly finished state for now, I have a [public instance](https://apollo.quackthe.duckspin.net) of Moss that you can use to get random AGC images. I might add a few more features, but for now, it serves the purposes that I need.

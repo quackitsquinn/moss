@@ -10,9 +10,9 @@ import (
 
 // DB represents the database structure, containing the largest folder path, the current file index, and the base path of the database.
 type DB struct {
-	highest_folder []uint8
-	file_idx       uint8
-	base           string
+	highestFolder []uint8
+	fileIDX       uint8
+	base          string
 }
 
 // LoadDB loads the database from the specified base path and returns a pointer to the DB struct.
@@ -23,9 +23,9 @@ func LoadDB(dbBase string) (*DB, error) {
 	}
 
 	return &DB{
-		highest_folder: largest_folder,
-		file_idx:       file_idx,
-		base:           dbBase,
+		highestFolder: largest_folder,
+		fileIDX:       file_idx,
+		base:          dbBase,
 	}, nil
 }
 
@@ -43,7 +43,7 @@ func (db *DB) FilePath(indices []uint8) (*string, error) {
 		return nil, errors.New("indices cannot be empty")
 	}
 
-	if len(indices) > len(db.highest_folder)+1 {
+	if len(indices) > len(db.highestFolder)+1 {
 		return nil, errors.New("indices exceed the depth of the database")
 	}
 
@@ -58,9 +58,18 @@ func (db *DB) FilePath(indices []uint8) (*string, error) {
 	return &path, nil
 }
 
+// genNumberOfIndices generates a random number of indices for selecting a file from the database.
+//
+//	It uses an exponential distribution to favor longer paths, but ensures that the number of indices does not exceed the depth of the database.
 func (db *DB) genNumberOfIndices() int {
-	exp := math.Min(rand.ExpFloat64(), 1.0)
-	return int(exp * float64(len(db.highest_folder)-1))
+	max := len(db.highestFolder) - 1
+	if max <= 0 {
+		return 0
+	}
+
+	u := rand.Float64()
+	exp := -math.Log(1 - u*(1-math.Exp(-1)))
+	return max - int(exp*float64(max))
 }
 
 // SelectFile randomly selects a file from the database and returns its path.
@@ -68,15 +77,15 @@ func (db *DB) genNumberOfIndices() int {
 //
 //	If the database is empty or if there is an error selecting a file, it returns an error.
 func (db *DB) SelectFile() (*string, error) {
-	if len(db.highest_folder) == 0 {
+	if len(db.highestFolder) == 0 {
 		return nil, errors.New("database is empty")
 	}
 
 	nIndices := db.genNumberOfIndices() + 2
 	path := make([]uint8, nIndices)
 	for i := range nIndices {
-		if i == len(db.highest_folder)-2 {
-			path[i] = uint8(rand.IntN(int(db.highest_folder[len(db.highest_folder)-1])))
+		if i == len(db.highestFolder)-2 {
+			path[i] = uint8(rand.IntN(int(db.highestFolder[len(db.highestFolder)-1])))
 			continue
 		}
 
@@ -85,7 +94,7 @@ func (db *DB) SelectFile() (*string, error) {
 			continue
 		}
 
-		path[i] = uint8(rand.IntN(int(db.highest_folder[len(db.highest_folder)-1]) + 1))
+		path[i] = uint8(rand.IntN(int(db.highestFolder[len(db.highestFolder)-1]) + 1))
 	}
 
 	file, err := db.FilePath(path)
